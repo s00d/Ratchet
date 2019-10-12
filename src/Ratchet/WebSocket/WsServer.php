@@ -1,20 +1,12 @@
 <?php
 namespace Ratchet\WebSocket;
-use Ratchet\ComponentInterface;
-use Ratchet\ConnectionInterface;
-use Ratchet\MessageComponentInterface as DataComponentInterface;
-use Ratchet\Http\HttpServerInterface;
-use Ratchet\Http\CloseResponseTrait;
+use GuzzleHttp\Psr7\Response;
 use Psr\Http\Message\RequestInterface;
-use Ratchet\RFC6455\Messaging\MessageInterface;
-use Ratchet\RFC6455\Messaging\FrameInterface;
-use Ratchet\RFC6455\Messaging\Frame;
-use Ratchet\RFC6455\Messaging\MessageBuffer;
-use Ratchet\RFC6455\Messaging\CloseFrameChecker;
-use Ratchet\RFC6455\Handshake\ServerNegotiator;
-use Ratchet\RFC6455\Handshake\RequestVerifier;
-use React\EventLoop\LoopInterface;
-use GuzzleHttp\Psr7 as gPsr;
+use Ratchet\MessageComponentInterface;
+use Ratchet\ConnectionInterface;
+use Ratchet\Http\HttpServerInterface;
+use Ratchet\WebSocket\Version;
+use Ratchet\WebSocket\Encoding\ToggleableValidator;
 
 /**
  * The adapter to handle WebSocket requests/responses
@@ -23,13 +15,18 @@ use GuzzleHttp\Psr7 as gPsr;
  * @link http://dev.w3.org/html5/websockets/
  */
 class WsServer implements HttpServerInterface {
-    use CloseResponseTrait;
+    /**
+     * Manage the various WebSocket versions to support
+     * @var VersionManager
+     * @note May not expose this in the future, may do through facade methods
+     */
+    public $versioner;
 
     /**
      * Decorated component
-     * @var \Ratchet\ComponentInterface
+     * @var \Ratchet\MessageComponentInterface
      */
-    private $delegate;
+    public $component;
 
     /**
      * @var \SplObjectStorage
@@ -37,68 +34,38 @@ class WsServer implements HttpServerInterface {
     protected $connections;
 
     /**
-     * @var \Ratchet\RFC6455\Messaging\CloseFrameChecker
+     * Holder of accepted protocols, implement through WampServerInterface
      */
-    private $closeFrameChecker;
+    protected $acceptedSubProtocols = array();
 
     /**
-     * @var \Ratchet\RFC6455\Handshake\ServerNegotiator
+     * UTF-8 validator
+     * @var \Ratchet\WebSocket\Encoding\ValidatorInterface
      */
-    private $handshakeNegotiator;
+    protected $validator;
 
     /**
-     * @var \Closure
+     * Flag if we have checked the decorated component for sub-protocols
+     * @var boolean
      */
-    private $ueFlowFactory;
+    private $isSpGenerated = false;
 
     /**
-     * @var \Closure
+     * @param \Ratchet\MessageComponentInterface $component Your application to run with WebSockets
+     * If you want to enable sub-protocols have your component implement WsServerInterface as well
      */
-    private $pongReceiver;
+    public function __construct(MessageComponentInterface $component) {
+        $this->versioner = new VersionManager;
+        $this->validator = new ToggleableValidator;
 
-    /**
-     * @var \Closure
-     */
-    private $msgCb;
+        $this->versioner
+            ->enableVersion(new Version\RFC6455($this->validator))
+            ->enableVersion(new Version\HyBi10($this->validator))
+            ->enableVersion(new Version\Hixie76)
+        ;
 
-    /**
-     * @param \Ratchet\WebSocket\MessageComponentInterface|\Ratchet\MessageComponentInterface $component Your application to run with WebSockets
-     * @note If you want to enable sub-protocols have your component implement WsServerInterface as well
-     */
-    public function __construct(ComponentInterface $component) {
-        if ($component instanceof MessageComponentInterface) {
-            $this->msgCb = function(ConnectionInterface $conn, MessageInterface $msg) {
-                $this->delegate->onMessage($conn, $msg);
-            };
-        } elseif ($component instanceof DataComponentInterface) {
-            $this->msgCb = function(ConnectionInterface $conn, MessageInterface $msg) {
-                $this->delegate->onMessage($conn, $msg->getPayload());
-            };
-        } else {
-            throw new \UnexpectedValueException('Expected instance of \Ratchet\WebSocket\MessageComponentInterface or \Ratchet\MessageComponentInterface');
-        }
-
-        if (bin2hex('✓') !== 'e29c93') {
-            throw new \DomainException('Bad encoding, unicode character ✓ did not match expected value. Ensure charset UTF-8 and check ini val mbstring.func_autoload');
-        }
-
-        $this->delegate    = $component;
+        $this->component   = $component;
         $this->connections = new \SplObjectStorage;
-
-        $this->closeFrameChecker   = new CloseFrameChecker;
-        $this->handshakeNegotiator = new ServerNegotiator(new RequestVerifier);
-        $this->handshakeNegotiator->setStrictSubProtocolCheck(true);
-
-        if ($component instanceof WsServerInterface) {
-            $this->handshakeNegotiator->setSupportedSubProtocols($component->getSubProtocols());
-        }
-
-        $this->pongReceiver = function() {};
-
-        $reusableUnderflowException = new \UnderflowException;
-        $this->ueFlowFactory = function() use ($reusableUnderflowException) {
-            return $reusableUnderflowException;
-        };
     }
 
     /**
@@ -109,37 +76,12 @@ class WsServer implements HttpServerInterface {
             throw new \UnexpectedValueException('$request can not be null');
         }
 
-        $conn->httpRequest = $request;
+        $conn->WebSocket              = new \StdClass;
+        $conn->WebSocket->request     = $request;
+        $conn->WebSocket->established = false;
+        $conn->WebSocket->closing     = false;
 
-        $conn->WebSocket            = new \StdClass;
-        $conn->WebSocket->closing   = false;
-
-        $response = $this->handshakeNegotiator->handshake($request)->withHeader('X-Powered-By', \Ratchet\VERSION);
-
-        $conn->send(gPsr\str($response));
-
-        if (101 !== $response->getStatusCode()) {
-            return $conn->close();
-        }
-
-        $wsConn = new WsConnection($conn);
-
-        $streamer = new MessageBuffer(
-            $this->closeFrameChecker,
-            function(MessageInterface $msg) use ($wsConn) {
-                $cb = $this->msgCb;
-                $cb($wsConn, $msg);
-            },
-            function(FrameInterface $frame) use ($wsConn) {
-                $this->onControlFrame($frame, $wsConn);
-            },
-            true,
-            $this->ueFlowFactory
-        );
-
-        $this->connections->attach($conn, new ConnContext($wsConn, $streamer));
-
-        return $this->delegate->onOpen($wsConn);
+        $this->attemptUpgrade($conn);
     }
 
     /**
@@ -150,7 +92,50 @@ class WsServer implements HttpServerInterface {
             return;
         }
 
-        $this->connections[$from]->buffer->onData($msg);
+        if (true === $from->WebSocket->established) {
+            return $from->WebSocket->version->onMessage($this->connections[$from], $msg);
+        }
+
+        $this->attemptUpgrade($from, $msg);
+    }
+
+    protected function attemptUpgrade(ConnectionInterface $conn, $data = '') {
+        if ('' !== $data) {
+            $conn->WebSocket->request->getBody()->write($data);
+        }
+
+        if (!$this->versioner->isVersionEnabled($conn->WebSocket->request)) {
+            return $this->close($conn);
+        }
+
+        $conn->WebSocket->version = $this->versioner->getVersion($conn->WebSocket->request);
+
+        try {
+            $response = $conn->WebSocket->version->handshake($conn->WebSocket->request);
+        } catch (\UnderflowException $e) {
+            return;
+        }
+
+        if (null !== ($subHeader = $conn->WebSocket->request->getHeader('Sec-WebSocket-Protocol'))) {
+            if ('' !== ($agreedSubProtocols = $this->getSubProtocolString($subHeader->normalize()))) {
+                $response->setHeader('Sec-WebSocket-Protocol', $agreedSubProtocols);
+            }
+        }
+
+        $response->setHeader('X-Powered-By', \Ratchet\VERSION);
+        $conn->send((string)$response);
+
+        if (101 != $response->getStatusCode()) {
+            return $conn->close();
+        }
+
+        $upgraded = $conn->WebSocket->version->upgradeConnection($conn, $this->component);
+
+        $this->connections->attach($conn, $upgraded);
+
+        $upgraded->WebSocket->established = true;
+
+        return $this->component->onOpen($upgraded);
     }
 
     /**
@@ -158,10 +143,10 @@ class WsServer implements HttpServerInterface {
      */
     public function onClose(ConnectionInterface $conn) {
         if ($this->connections->contains($conn)) {
-            $context = $this->connections[$conn];
+            $decor = $this->connections[$conn];
             $this->connections->detach($conn);
 
-            $this->delegate->onClose($context->connection);
+            $this->component->onClose($decor);
         }
     }
 
@@ -169,57 +154,79 @@ class WsServer implements HttpServerInterface {
      * {@inheritdoc}
      */
     public function onError(ConnectionInterface $conn, \Exception $e) {
-        if ($this->connections->contains($conn)) {
-            $this->delegate->onError($this->connections[$conn]->connection, $e);
+        if ($conn->WebSocket->established && $this->connections->contains($conn)) {
+            $this->component->onError($this->connections[$conn], $e);
         } else {
             $conn->close();
         }
     }
 
-    public function onControlFrame(FrameInterface $frame, WsConnection $conn) {
-        switch ($frame->getOpCode()) {
-            case Frame::OP_CLOSE:
-                $conn->close($frame);
-                break;
-            case Frame::OP_PING:
-                $conn->send(new Frame($frame->getPayload(), true, Frame::OP_PONG));
-                break;
-            case Frame::OP_PONG:
-                $pongReceiver = $this->pongReceiver;
-                $pongReceiver($frame, $conn);
-            break;
+    /**
+     * Disable a specific version of the WebSocket protocol
+     * @param int $versionId Version ID to disable
+     * @return WsServer
+     */
+    public function disableVersion($versionId) {
+        $this->versioner->disableVersion($versionId);
+
+        return $this;
+    }
+
+    /**
+     * Toggle weather to check encoding of incoming messages
+     * @param bool
+     * @return WsServer
+     */
+    public function setEncodingChecks($opt) {
+        $this->validator->on = (boolean)$opt;
+
+        return $this;
+    }
+
+    /**
+     * @param string
+     * @return boolean
+     */
+    public function isSubProtocolSupported($name) {
+        if (!$this->isSpGenerated) {
+            if ($this->component instanceof WsServerInterface) {
+                $this->acceptedSubProtocols = array_flip($this->component->getSubProtocols());
+            }
+
+            $this->isSpGenerated = true;
         }
+
+        return array_key_exists($name, $this->acceptedSubProtocols);
     }
 
-    public function setStrictSubProtocolCheck($enable) {
-        $this->handshakeNegotiator->setStrictSubProtocolCheck($enable);
+    /**
+     * @param  \Traversable|null $requested
+     * @return string
+     */
+    protected function getSubProtocolString(\Traversable $requested = null) {
+        if (null !== $requested) {
+            foreach ($requested as $sub) {
+                if ($this->isSubProtocolSupported($sub)) {
+                    return $sub;
+                }
+            }
+        }
+
+        return '';
     }
 
-    public function enableKeepAlive(LoopInterface $loop, $interval = 30) {
-        $lastPing = new Frame(uniqid(), true, Frame::OP_PING);
-        $pingedConnections = new \SplObjectStorage;
-        $splClearer = new \SplObjectStorage;
+    /**
+     * Close a connection with an HTTP response
+     * @param \Ratchet\ConnectionInterface $conn
+     * @param int                          $code HTTP status code
+     */
+    protected function close(ConnectionInterface $conn, $code = 400) {
+        $response = new Response($code, array(
+            'Sec-WebSocket-Version' => $this->versioner->getSupportedVersionString()
+          , 'X-Powered-By'          => \Ratchet\VERSION
+        ));
 
-        $this->pongReceiver = function(FrameInterface $frame, $wsConn) use ($pingedConnections, &$lastPing) {
-            if ($frame->getPayload() === $lastPing->getPayload()) {
-                $pingedConnections->detach($wsConn);
-            }
-        };
-
-        $loop->addPeriodicTimer((int)$interval, function() use ($pingedConnections, &$lastPing, $splClearer) {
-            foreach ($pingedConnections as $wsConn) {
-                $wsConn->close();
-            }
-            $pingedConnections->removeAllExcept($splClearer);
-
-            $lastPing = new Frame(uniqid(), true, Frame::OP_PING);
-
-            foreach ($this->connections as $key => $conn) {
-                $wsConn  = $this->connections[$conn]->connection;
-
-                $wsConn->send($lastPing);
-                $pingedConnections->attach($wsConn);
-            }
-        });
-   }
+        $conn->send((string)$response);
+        $conn->close();
+    }
 }

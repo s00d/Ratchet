@@ -5,7 +5,6 @@ use React\EventLoop\LoopInterface;
 use React\Socket\ServerInterface;
 use React\EventLoop\Factory as LoopFactory;
 use React\Socket\Server as Reactor;
-use React\Socket\SecureServer as SecureReactor;
 
 /**
  * Creates an open-ended socket to listen on a port for incoming connections.
@@ -21,6 +20,12 @@ class IoServer {
      * @var \Ratchet\MessageComponentInterface
      */
     public $app;
+
+    /**
+     * Array of React event handlers
+     * @var \SplFixedArray
+     */
+    protected $handlers;
 
     /**
      * The socket server the Ratchet Application is run off of
@@ -46,17 +51,23 @@ class IoServer {
         $this->socket = $socket;
 
         $socket->on('connection', array($this, 'handleConnect'));
+
+        $this->handlers = new \SplFixedArray(3);
+        $this->handlers[0] = array($this, 'handleData');
+        $this->handlers[1] = array($this, 'handleEnd');
+        $this->handlers[2] = array($this, 'handleError');
     }
 
     /**
-     * @param  \Ratchet\MessageComponentInterface $component  The application that I/O will call when events are received
-     * @param  int                                $port       The port to server sockets on
-     * @param  string                             $address    The address to receive sockets on (0.0.0.0 means receive connections from any)
+     * @param  \Ratchet\MessageComponentInterface $component The application that I/O will call when events are received
+     * @param  int                                $port      The port to server sockets on
+     * @param  string                             $address   The address to receive sockets on (0.0.0.0 means receive connections from any)
      * @return IoServer
      */
     public static function factory(MessageComponentInterface $component, $port = 80, $address = '0.0.0.0') {
         $loop   = LoopFactory::create();
-        $socket = new Reactor($address . ':' . $port, $loop);
+        $socket = new Reactor($loop);
+        $socket->listen($port, $address);
 
         return new static($component, $socket, $loop);
     }
@@ -81,25 +92,15 @@ class IoServer {
      */
     public function handleConnect($conn) {
         $conn->decor = new IoConnection($conn);
-        $conn->decor->resourceId = (int)$conn->stream;
 
-        $uri = $conn->getRemoteAddress();
-        $conn->decor->remoteAddress = trim(
-            parse_url((strpos($uri, '://') === false ? 'tcp://' : '') . $uri, PHP_URL_HOST),
-            '[]'
-        );
+        $conn->decor->resourceId    = (int)$conn->stream;
+        $conn->decor->remoteAddress = $conn->getRemoteAddress();
 
         $this->app->onOpen($conn->decor);
 
-        $conn->on('data', function ($data) use ($conn) {
-            $this->handleData($data, $conn);
-        });
-        $conn->on('close', function () use ($conn) {
-            $this->handleEnd($conn);
-        });
-        $conn->on('error', function (\Exception $e) use ($conn) {
-            $this->handleError($e, $conn);
-        });
+        $conn->on('data', $this->handlers[0]);
+        $conn->on('end', $this->handlers[1]);
+        $conn->on('error', $this->handlers[2]);
     }
 
     /**

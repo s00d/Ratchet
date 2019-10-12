@@ -1,11 +1,10 @@
 <?php
 namespace Ratchet\Http;
+use GuzzleHttp\Psr7\Response;
 use Ratchet\MessageComponentInterface;
 use Ratchet\ConnectionInterface;
 
 class HttpServer implements MessageComponentInterface {
-    use CloseResponseTrait;
-
     /**
      * Buffers incoming HTTP requests returning a Guzzle Request when coalesced
      * @var HttpRequestParser
@@ -72,5 +71,20 @@ class HttpServer implements MessageComponentInterface {
         } else {
             $this->close($conn, 500);
         }
+    }
+
+    /**
+     * Close a connection with an HTTP response
+     * @param \Ratchet\ConnectionInterface $conn
+     * @param int                          $code HTTP status code
+     * @return null
+     */
+    protected function close(ConnectionInterface $conn, $code = 400) {
+        $response = new Response($code, array(
+            'X-Powered-By' => \Ratchet\VERSION
+        ));
+
+        $conn->send((string)$response);
+        $conn->close();
     }
 }

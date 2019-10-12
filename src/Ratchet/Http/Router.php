@@ -1,25 +1,21 @@
 <?php
 namespace Ratchet\Http;
-use Ratchet\ConnectionInterface;
+use GuzzleHttp\Psr7\Response;
 use Psr\Http\Message\RequestInterface;
+use Ratchet\ConnectionInterface;
 use Symfony\Component\Routing\Matcher\UrlMatcherInterface;
 use Symfony\Component\Routing\Exception\MethodNotAllowedException;
 use Symfony\Component\Routing\Exception\ResourceNotFoundException;
 use GuzzleHttp\Psr7 as gPsr;
 
 class Router implements HttpServerInterface {
-    use CloseResponseTrait;
-
     /**
      * @var \Symfony\Component\Routing\Matcher\UrlMatcherInterface
      */
     protected $_matcher;
 
-    private $_noopController;
-
     public function __construct(UrlMatcherInterface $matcher) {
         $this->_matcher = $matcher;
-        $this->_noopController = new NoOpHttpServerController;
     }
 
     /**
@@ -31,10 +27,7 @@ class Router implements HttpServerInterface {
             throw new \UnexpectedValueException('$request can not be null');
         }
 
-        $conn->controller = $this->_noopController;
-
         $uri = $request->getUri();
-
         $context = $this->_matcher->getContext();
         $context->setMethod($request->getMethod());
         $context->setHost($uri->getHost());
@@ -55,7 +48,7 @@ class Router implements HttpServerInterface {
             throw new \UnexpectedValueException('All routes must implement Ratchet\Http\HttpServerInterface');
         }
 
-        $parameters = [];
+        $parameters = array();
         foreach($route as $key => $value) {
             if ((is_string($key)) && ('_' !== substr($key, 0, 1))) {
                 $parameters[$key] = $value;
@@ -72,14 +65,14 @@ class Router implements HttpServerInterface {
     /**
      * {@inheritdoc}
      */
-    public function onMessage(ConnectionInterface $from, $msg) {
+    function onMessage(ConnectionInterface $from, $msg) {
         $from->controller->onMessage($from, $msg);
     }
 
     /**
      * {@inheritdoc}
      */
-    public function onClose(ConnectionInterface $conn) {
+    function onClose(ConnectionInterface $conn) {
         if (isset($conn->controller)) {
             $conn->controller->onClose($conn);
         }
@@ -88,9 +81,26 @@ class Router implements HttpServerInterface {
     /**
      * {@inheritdoc}
      */
-    public function onError(ConnectionInterface $conn, \Exception $e) {
+    function onError(ConnectionInterface $conn, \Exception $e) {
         if (isset($conn->controller)) {
             $conn->controller->onError($conn, $e);
         }
+    }
+
+    /**
+     * Close a connection with an HTTP response
+     * @param \Ratchet\ConnectionInterface $conn
+     * @param int $code HTTP status code
+     * @param array $additionalHeaders
+     * @return null
+     */
+    protected function close(ConnectionInterface $conn, $code = 400, array $additionalHeaders = array()) {
+        $headers = array_merge(array(
+            'X-Powered-By' => \Ratchet\VERSION
+        ), $additionalHeaders);
+        $response = new Response($code, $headers);
+
+        $conn->send((string)$response);
+        $conn->close();
     }
 }

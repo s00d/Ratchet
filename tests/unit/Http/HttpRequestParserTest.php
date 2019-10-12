@@ -1,5 +1,6 @@
 <?php
 namespace Ratchet\Http;
+use Ratchet\Http\HttpRequestParser;
 
 /**
  * @covers Ratchet\Http\HttpRequestParser
@@ -45,6 +46,6 @@ class HttpRequestParserTest extends \PHPUnit_Framework_TestCase {
         $conn = $this->getMock('\Ratchet\ConnectionInterface');
         $return = $this->parser->onMessage($conn, "GET / HTTP/1.1\r\nHost: socketo.me\r\n\r\n");
 
-        $this->assertInstanceOf('\Psr\Http\Message\RequestInterface', $return);
+        $this->assertInstanceOf('\Guzzle\Http\Message\RequestInterface', $return);
     }
 }

@@ -6,7 +6,7 @@ use GuzzleHttp\Psr7 as gPsr;
 
 /**
  * This class receives streaming data from a client request
- * and parses HTTP headers, returning a PSR-7 Request object
+ * and parses HTTP headers, returning a Guzzle Request object
  * once it's been buffered
  */
 class HttpRequestParser implements MessageInterface {
@@ -22,7 +22,7 @@ class HttpRequestParser implements MessageInterface {
     /**
      * @param \Ratchet\ConnectionInterface $context
      * @param string                       $data Data stream to buffer
-     * @return \Psr\Http\Message\RequestInterface
+     * @return \Guzzle\Http\Message\RequestInterface|null
      * @throws \OverflowException If the message buffer has become too large
      */
     public function onMessage(ConnectionInterface $context, $data) {
@@ -54,10 +54,6 @@ class HttpRequestParser implements MessageInterface {
         return (boolean)strpos($message, static::EOM);
     }
 
-    /**
-     * @param string $headers
-     * @return \Psr\Http\Message\RequestInterface
-     */
     public function parse($headers) {
         return gPsr\parse_request($headers);
     }
