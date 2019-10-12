@@ -1,5 +1,7 @@
 <?php
 namespace Ratchet\WebSocket\Version;
+use GuzzleHttp\Psr7\Response;
+use Psr\Http\Message\RequestInterface;
 use Ratchet\ConnectionInterface;
 use Ratchet\MessageInterface;
 use Ratchet\WebSocket\Version\RFC6455\HandshakeVerifier;
@@ -8,8 +10,6 @@ use Ratchet\WebSocket\Version\RFC6455\Frame;
 use Ratchet\WebSocket\Version\RFC6455\Connection;
 use Ratchet\WebSocket\Encoding\ValidatorInterface;
 use Ratchet\WebSocket\Encoding\Validator;
-use Guzzle\Http\Message\RequestInterface;
-use Guzzle\Http\Message\Response;
 
 /**
  * The latest version of the WebSocket protocol
