@@ -109,21 +109,21 @@ class WsServer implements HttpServerInterface {
         }
 
         $conn->WebSocket->version = $this->versioner->getVersion($conn->WebSocket->request);
-
         try {
             $response = $conn->WebSocket->version->handshake($conn->WebSocket->request);
         } catch (\UnderflowException $e) {
             return;
         }
 
-        if (null !== ($subHeader = $conn->WebSocket->request->getHeader('Sec-WebSocket-Protocol'))) {
+        if (null !== ($subHeader = $conn->WebSocket->request->getHeader('Sec-WebSocket-Protocol')[0] ?? null)) {
             if ('' !== ($agreedSubProtocols = $this->getSubProtocolString($subHeader->normalize()))) {
-                $response->setHeader('Sec-WebSocket-Protocol', $agreedSubProtocols);
+                $response->withHeader('Sec-WebSocket-Protocol', $agreedSubProtocols);
             }
         }
 
-        $response->setHeader('X-Powered-By', \Ratchet\VERSION);
-        $conn->send((string)$response);
+        /** @var \GuzzleHttp\Psr7\Response  $response */
+        $response->withHeader('X-Powered-By', \Ratchet\VERSION);
+        $conn->send(\GuzzleHttp\Psr7\str($response));
 
         if (101 != $response->getStatusCode()) {
             return $conn->close();
@@ -226,7 +226,7 @@ class WsServer implements HttpServerInterface {
           , 'X-Powered-By'          => \Ratchet\VERSION
         ));
 
-        $conn->send((string)$response);
+        $conn->send(\GuzzleHttp\Psr7\str($response));
         $conn->close();
     }
 }

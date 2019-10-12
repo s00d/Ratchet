@@ -31,7 +31,7 @@ class OriginCheck implements HttpServerInterface {
      * {@inheritdoc}
      */
     public function onOpen(ConnectionInterface $conn, RequestInterface $request = null) {
-        $header = (string)$request->getHeader('Origin');
+        $header = (string)$request->getHeader('Origin')[0];
         $origin = parse_url($header, PHP_URL_HOST) ?: $header;
 
         if (!in_array($origin, $this->allowedOrigins)) {
@@ -73,7 +73,7 @@ class OriginCheck implements HttpServerInterface {
             'X-Powered-By' => \Ratchet\VERSION
         ));
 
-        $conn->send((string)$response);
+        $conn->send(\GuzzleHttp\Psr7\str($response));
         $conn->close();
     }
 }

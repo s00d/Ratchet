@@ -23,7 +23,7 @@ class Hixie76 implements VersionInterface {
      * {@inheritdoc}
      */
     public function isProtocol(RequestInterface $request) {
-        return !(null === $request->getHeader('Sec-WebSocket-Key2'));
+        return !(null === $request->getHeader('Sec-WebSocket-Key2')[0]);
     }
 
     /**
@@ -43,13 +43,13 @@ class Hixie76 implements VersionInterface {
             throw new \UnderflowException("Not enough data received to issue challenge response");
         }
 
-        $challenge = $this->sign((string)$request->getHeader('Sec-WebSocket-Key1'), (string)$request->getHeader('Sec-WebSocket-Key2'), $body);
+        $challenge = $this->sign((string)$request->getHeader('Sec-WebSocket-Key1')[0], (string)$request->getHeader('Sec-WebSocket-Key2')[0], $body);
 
         $headers = array(
             'Upgrade'                => 'WebSocket'
           , 'Connection'             => 'Upgrade'
-          , 'Sec-WebSocket-Origin'   => (string)$request->getHeader('Origin')
-          , 'Sec-WebSocket-Location' => 'ws://' . (string)$request->getHeader('Host') . $request->getUri()->getPath()
+          , 'Sec-WebSocket-Origin'   => (string)$request->getHeader('Origin')[0]
+          , 'Sec-WebSocket-Location' => 'ws://' . (string)$request->getHeader('Host')[0] . $request->getUri()->getPath()
         );
 
         $response = new Response(101, $headers, $challenge);

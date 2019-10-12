@@ -84,7 +84,7 @@ class HttpServer implements MessageComponentInterface {
             'X-Powered-By' => \Ratchet\VERSION
         ));
 
-        $conn->send((string)$response);
+        $conn->send(\GuzzleHttp\Psr7\str($response));
         $conn->close();
     }
 }

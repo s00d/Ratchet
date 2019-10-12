@@ -20,10 +20,10 @@ class HandshakeVerifier {
         $passes += (int)$this->verifyMethod($request->getMethod());
         $passes += (int)$this->verifyHTTPVersion($request->getProtocolVersion());
         $passes += (int)$this->verifyRequestURI($request->getUri()->getPath());
-        $passes += (int)$this->verifyHost((string)$request->getHeader('Host'));
-        $passes += (int)$this->verifyUpgradeRequest((string)$request->getHeader('Upgrade'));
-        $passes += (int)$this->verifyConnection((string)$request->getHeader('Connection'));
-        $passes += (int)$this->verifyKey((string)$request->getHeader('Sec-WebSocket-Key'));
+        $passes += (int)$this->verifyHost((string)$request->getHeader('Host')[0]);
+        $passes += (int)$this->verifyUpgradeRequest((string)$request->getHeader('Upgrade')[0]);
+        $passes += (int)$this->verifyConnection((string)$request->getHeader('Connection')[0]);
+        $passes += (int)$this->verifyKey((string)$request->getHeader('Sec-WebSocket-Key')[0]);
         //$passes += (int)$this->verifyVersion($headers['Sec-WebSocket-Version']); // Temporarily breaking functionality
 
         return (7 === $passes);

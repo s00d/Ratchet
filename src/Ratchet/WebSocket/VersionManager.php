@@ -40,7 +40,7 @@ class VersionManager {
      * @return bool
      */
     public function isVersionEnabled(RequestInterface $request) {
-        foreach ($this->versions as $version) {
+        foreach ($this->versions as $v => $version) {
             if ($version->isProtocol($request)) {
                 return true;
             }
