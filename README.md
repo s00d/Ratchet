@@ -1,6 +1,7 @@
-#Ratchet
+# Ratchet
 
-Old version with guzzle 6. use v0.3.7
+Old version Ratchet with guzzle 6. 
+use v0.3.7*
 
 ## Install
 
