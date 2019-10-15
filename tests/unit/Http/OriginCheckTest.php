@@ -8,8 +8,8 @@ use Ratchet\AbstractMessageComponentTestCase;
 class OriginCheckTest extends AbstractMessageComponentTestCase {
     protected $_reqStub;
 
-    public function setUp() {
-        $this->_reqStub = $this->getMock('Guzzle\Http\Message\RequestInterface');
+    public function setUp():void {
+        $this->_reqStub = $this->createMock(\Psr\Http\Message\RequestInterface::class);
         $this->_reqStub->expects($this->any())->method('getHeader')->will($this->returnValue('localhost'));
 
         parent::setUp();
@@ -22,15 +22,15 @@ class OriginCheckTest extends AbstractMessageComponentTestCase {
     }
 
     public function getConnectionClassString() {
-        return '\Ratchet\ConnectionInterface';
+        return \Ratchet\ConnectionInterface::class;
     }
 
     public function getDecoratorClassString() {
-        return '\Ratchet\Http\OriginCheck';
+        return \Ratchet\Http\OriginCheck::class;
     }
 
     public function getComponentClassString() {
-        return '\Ratchet\Http\HttpServerInterface';
+        return \Ratchet\Http\HttpServerInterface::class;
     }
 
     public function testCloseOnNonMatchingOrigin() {

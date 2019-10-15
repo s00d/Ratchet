@@ -116,7 +116,7 @@ class WsServer implements HttpServerInterface {
         }
 
         if (null !== ($subHeader = $conn->WebSocket->request->getHeader('Sec-WebSocket-Protocol')[0] ?? null)) {
-            if ('' !== ($agreedSubProtocols = $this->getSubProtocolString($subHeader->normalize()))) {
+            if ('' !== ($agreedSubProtocols = $this->getSubProtocolString(\GuzzleHttp\Psr7\normalize_header($subHeader)))) {
                 $response->withHeader('Sec-WebSocket-Protocol', $agreedSubProtocols);
             }
         }

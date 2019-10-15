@@ -7,8 +7,9 @@
 
     $loop = new $impl;
     $sock = new React\Socket\Server("0.0.0.0:{$port}", $loop);
-    $app  = new Ratchet\Http\HttpServer(new Ratchet\WebSocket\WsServer(new Ratchet\Server\EchoServer));
-
+    $web  = new Ratchet\WebSocket\WsServer(new Ratchet\Server\EchoServer);
+    $app  = new Ratchet\Http\HttpServer($web);
+    $web->setEncodingChecks(false);
 
     $server = new Ratchet\Server\IoServer($app, $sock, $loop);
     $server->run();

@@ -8,12 +8,12 @@ use Ratchet\Mock\WampComponent as TestComponent;
  * @covers Ratchet\Wamp\WampServerInterface
  * @covers Ratchet\Wamp\WampConnection
  */
-class ServerProtocolTest extends \PHPUnit_Framework_TestCase {
+class ServerProtocolTest extends \PHPUnit\Framework\TestCase {
     protected $_comp;
 
     protected $_app;
 
-    public function setUp() {
+    public function setUp():void {
         $this->_app  = new TestComponent;
         $this->_comp = new ServerProtocol($this->_app);
     }
@@ -36,7 +36,7 @@ class ServerProtocolTest extends \PHPUnit_Framework_TestCase {
      * @dataProvider invalidMessageProvider
      */
     public function testInvalidMessages($type) {
-        $this->setExpectedException('\Ratchet\Wamp\Exception');
+        $this->expectException(\Ratchet\Wamp\Exception::class);
 
         $conn = $this->newConn();
         $this->_comp->onOpen($conn);
@@ -102,7 +102,7 @@ class ServerProtocolTest extends \PHPUnit_Framework_TestCase {
         $paramNum = array_shift($args);
 
         $uri = 'http://example.com/endpoint/' . rand(1, 100);
-        $id  = uniqid();
+        $id  = uniqid('', true);
         $clientMessage = array_merge(array(2, $id, $uri), $args);
 
         $conn = $this->newConn();
@@ -222,8 +222,7 @@ class ServerProtocolTest extends \PHPUnit_Framework_TestCase {
     }
 
     public function testMessageMustBeJson() {
-        $this->setExpectedException('\\Ratchet\\Wamp\\JsonException');
-
+        $this->expectException(\Ratchet\Wamp\JsonException::class);
         $conn = new Connection;
 
         $this->_comp->onOpen($conn);
@@ -241,7 +240,7 @@ class ServerProtocolTest extends \PHPUnit_Framework_TestCase {
     }
 
     public function testWampOnMessageApp() {
-        $app = $this->getMock('\\Ratchet\\Wamp\\WampServerInterface');
+        $app = $this->createMock(\Ratchet\Wamp\WampServerInterface::class);
         $wamp = new ServerProtocol($app);
 
         $this->assertContains('wamp', $wamp->getSubProtocols());
@@ -259,7 +258,7 @@ class ServerProtocolTest extends \PHPUnit_Framework_TestCase {
      * @dataProvider badFormatProvider
      */
     public function testValidJsonButInvalidProtocol($message) {
-        $this->setExpectedException('\Ratchet\Wamp\Exception');
+        $this->expectException(\Ratchet\Wamp\Exception::class);
 
         $conn = $this->newConn();
         $this->_comp->onOpen($conn);

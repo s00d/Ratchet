@@ -1,26 +1,27 @@
 <?php
 namespace Ratchet\Http;
 use Ratchet\AbstractMessageComponentTestCase;
+use Ratchet\Http\HttpServerInterface;
 
 /**
  * @covers Ratchet\Http\HttpServer
  */
 class HttpServerTest extends AbstractMessageComponentTestCase {
-    public function setUp() {
+    public function setUp():void {
         parent::setUp();
         $this->_conn->httpHeadersReceived = true;
     }
 
     public function getConnectionClassString() {
-        return '\Ratchet\ConnectionInterface';
+        return \Ratchet\ConnectionInterface::class;
     }
 
     public function getDecoratorClassString() {
-        return '\Ratchet\Http\HttpServer';
+        return \Ratchet\Http\HttpServer::class;
     }
 
     public function getComponentClassString() {
-        return '\Ratchet\Http\HttpServerInterface';
+        return HttpServerInterface::class;
     }
 
     public function testOpen() {
@@ -36,7 +37,7 @@ class HttpServerTest extends AbstractMessageComponentTestCase {
         $this->_conn->httpHeadersReceived = false;
         $this->_serv->onMessage($this->_conn, $headers);
 
-        $message = "Hello World!";
+        $message = 'Hello World!';
         $this->_app->expects($this->once())->method('onMessage')->with($this->isExpectedConnection(), $message);
         $this->_serv->onMessage($this->_conn, $message);
     }

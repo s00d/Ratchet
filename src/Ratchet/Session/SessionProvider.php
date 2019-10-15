@@ -49,9 +49,11 @@ class SessionProvider implements MessageComponentInterface, WsServerInterface {
         $this->_handler = $handler;
         $this->_null    = new NullSessionHandler;
 
-        ini_set('session.auto_start', 0);
-        ini_set('session.cache_limiter', '');
-        ini_set('session.use_cookies', 0);
+       try {
+           ini_set('session.auto_start', 0);
+           ini_set('session.cache_limiter', '');
+           ini_set('session.use_cookies', 0);
+       }catch (\Exception $e) {}
 
         $this->setOptions($options);
 

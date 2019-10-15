@@ -8,7 +8,7 @@ use Symfony\Component\HttpFoundation\Session\Attribute\AttributeBag;
 use Symfony\Component\HttpFoundation\Session\Flash\FlashBag;
 use Symfony\Component\HttpFoundation\Session\Storage\Handler\PdoSessionHandler;
 
-class VirtualSessionStoragePDOTest extends \PHPUnit_Framework_TestCase
+class VirtualSessionStoragePDOTest extends \PHPUnit\Framework\TestCase
 {
     /**
      * @var VirtualSessionStorage
@@ -17,8 +17,7 @@ class VirtualSessionStoragePDOTest extends \PHPUnit_Framework_TestCase
 
     protected $_pathToDB;
 
-    public function setUp()
-    {
+    public function setUp():void{
         $schema = <<<SQL
 CREATE TABLE `sessions` (
     `sess_id` VARBINARY(128) NOT NULL PRIMARY KEY,
@@ -42,7 +41,7 @@ SQL;
         $this->_virtualSessionStorage->registerBag(new AttributeBag());
     }
 
-    public function tearDown()
+    public function tearDown():void
     {
         unlink($this->_pathToDB);
     }

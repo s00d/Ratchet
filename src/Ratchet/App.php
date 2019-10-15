@@ -61,7 +61,7 @@ class App {
      * @param LoopInterface $loop     Specific React\EventLoop to bind the application to. null will create one for you.
      */
     public function __construct($httpHost = 'localhost', $port = 8080, $address = '127.0.0.1', LoopInterface $loop = null) {
-        if (extension_loaded('xdebug')) {
+        if (extension_loaded('xdebug') && getenv('RATCHET_DISABLE_XDEBUG_WARN') === false) {
             trigger_error('XDebug extension detected. Remember to disable this if performance testing or going live!', E_USER_WARNING);
         }
 
@@ -76,8 +76,7 @@ class App {
         $this->httpHost = $httpHost;
         $this->port = $port;
 
-        $socket = new Reactor($loop);
-        $socket->listen($port, $address);
+        $socket = new Reactor("{$address}:$port", $loop);
 
         $this->routes  = new RouteCollection;
         $this->_server = new IoServer(new HttpServer(new Router(new UrlMatcher($this->routes, new RequestContext))), $socket, $loop);
@@ -85,13 +84,9 @@ class App {
         $policy = new FlashPolicy;
         $policy->addAllowedAccess($httpHost, 80);
         $policy->addAllowedAccess($httpHost, $port);
-        $flashSock = new Reactor($loop);
+
+        $flashSock = new Reactor(80 == $port?'0.0.0.0:843':8843 ,$loop);
         $this->flashServer = new IoServer($policy, $flashSock);
-        if (80 == $port) {
-            $flashSock->listen(843, '0.0.0.0');
-        } else {
-            $flashSock->listen(8843);
-        }
     }
 
     /**

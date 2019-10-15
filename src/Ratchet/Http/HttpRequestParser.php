@@ -3,6 +3,7 @@ namespace Ratchet\Http;
 use Ratchet\MessageInterface;
 use Ratchet\ConnectionInterface;
 use GuzzleHttp\Psr7 as gPsr;
+use Psr\Http\Message\RequestInterface;
 
 /**
  * This class receives streaming data from a client request
@@ -22,7 +23,7 @@ class HttpRequestParser implements MessageInterface {
     /**
      * @param \Ratchet\ConnectionInterface $context
      * @param string                       $data Data stream to buffer
-     * @return \Guzzle\Http\Message\RequestInterface|null
+     * @return RequestInterface|null
      * @throws \OverflowException If the message buffer has become too large
      */
     public function onMessage(ConnectionInterface $context, $data) {
@@ -55,6 +56,9 @@ class HttpRequestParser implements MessageInterface {
     }
 
     public function parse($headers) {
-        return gPsr\parse_request($headers);
+        try {
+            return gPsr\parse_request($headers);
+        } catch (\Exception $e){}
+        return null;
     }
 }
