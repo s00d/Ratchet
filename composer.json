@@ -34,7 +34,6 @@
     "symfony/routing": "^2.2|^3.0",
     "guzzlehttp/guzzle": "^6.3",
     "ext-simplexml": "*",
-    "symfony/var-dumper": "^4.3.5",
     "ext-json": "*"
   },
   "require-dev": {
